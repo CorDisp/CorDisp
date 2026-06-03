@@ -1257,22 +1257,75 @@ function mostrarToast(titulo, prod) {
 </style>
 
 <script>
-// Ventas - notificacion
+// Ventas - notificacion y WA post-pago
 (function() {
   const params = new URLSearchParams(window.location.search);
   const status = params.get('status') || params.get('collection_status');
   if (status === 'approved') {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    function beep(f,d,v){const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type='sine';g.gain.setValueAtTime(v||.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+d);o.start(ctx.currentTime);o.stop(ctx.currentTime+d);}
-    setTimeout(()=>{beep(523,.15);setTimeout(()=>beep(659,.15),150);setTimeout(()=>beep(784,.3),300);},300);
-    const t=document.createElement('div');
-    t.innerHTML=`<div style="position:fixed;top:20px;right:20px;z-index:9999;background:linear-gradient(135deg,#10B981,#059669);color:white;padding:1.4rem 1.8rem;border-radius:14px;box-shadow:0 8px 32px rgba(16,185,129,.5);font-family:Inter,sans-serif;font-size:.9rem;max-width:320px;animation:slideInRight .4s ease">
-      <div style="font-size:1.4rem;margin-bottom:.5rem">🎉 ¡Venta realizada!</div>
-      <div style="font-weight:600;margin-bottom:.4rem">Pago aprobado ✓</div>
-      <div style="font-size:.8rem;opacity:.9;line-height:1.5">Entrá a <strong>mercadopago.com.ar → Actividad</strong> para ver los datos del comprador y la dirección de envío.</div>
-    </div>`;
-    document.body.appendChild(t);
-    setTimeout(()=>t.remove(),10000);
+    // Sonido de venta
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      function beep(f,d,v){const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type='sine';g.gain.setValueAtTime(v||.3,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+d);o.start(ctx.currentTime);o.stop(ctx.currentTime+d);}
+      setTimeout(()=>{beep(523,.15);setTimeout(()=>beep(659,.15),150);setTimeout(()=>beep(784,.3),300);},300);
+    } catch(e){}
+
+    // Recuperar datos del pedido guardados antes de ir a MP
+    const pedidoStr = sessionStorage.getItem('pedidoCorDisp');
+    
+    if (pedidoStr) {
+      const p = JSON.parse(pedidoStr);
+      sessionStorage.removeItem('pedidoCorDisp');
+      
+      // Mandar WA al vendedor con todos los datos
+      const msg = encodeURIComponent(
+        `🎉 *PAGO APROBADO - CorDisp*\n\n` +
+        `*Producto:* ${p.producto}\n` +
+        `*Precio:* ${p.precio}\n\n` +
+        `*Cliente:* ${p.nombre} ${p.apellido}\n` +
+        `*Email:* ${p.email}\n` +
+        `*Teléfono:* ${p.tel}\n\n` +
+        `*Dirección de envío:*\n` +
+        `${p.calle}${p.piso ? ' ' + p.piso : ''}\n` +
+        `${p.ciudad}, ${p.provincia} (CP: ${p.cp})\n\n` +
+        `*Pago:* MercadoPago ✓ Aprobado`
+      );
+      
+      // Mostrar pantalla de éxito con botón para confirmar por WA
+      const overlay = document.createElement('div');
+      overlay.innerHTML = `
+        <div style="position:fixed;inset:0;z-index:9999;background:rgba(7,9,15,.97);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;padding:2rem">
+          <div style="max-width:420px;text-align:center">
+            <div style="font-size:4rem;margin-bottom:1rem">🎉</div>
+            <h2 style="color:#fff;font-size:1.6rem;font-weight:700;margin-bottom:.5rem">¡Pago aprobado!</h2>
+            <p style="color:#94A3B8;font-size:.9rem;line-height:1.6;margin-bottom:2rem">
+              Tu compra fue confirmada. Ahora confirmá tu pedido por WhatsApp para coordinar el envío.
+            </p>
+            <a href="https://api.whatsapp.com/send?phone=543512470871&text=${msg}" 
+               target="_blank"
+               style="display:inline-flex;align-items:center;gap:.6rem;background:#25D366;color:#fff;padding:1rem 2rem;border-radius:10px;font-size:1rem;font-weight:600;text-decoration:none;margin-bottom:1rem">
+              💬 Confirmar pedido por WhatsApp
+            </a>
+            <br>
+            <button onclick="this.parentElement.parentElement.parentElement.remove()" 
+              style="background:none;border:none;color:#64748B;font-size:.82rem;cursor:pointer;margin-top:.5rem;font-family:Inter,sans-serif">
+              Volver a la tienda
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      
+    } else {
+      // Sin datos guardados, mostrar toast simple
+      const t=document.createElement('div');
+      t.innerHTML=`<div style="position:fixed;top:20px;right:20px;z-index:9999;background:linear-gradient(135deg,#10B981,#059669);color:white;padding:1.4rem 1.8rem;border-radius:14px;box-shadow:0 8px 32px rgba(16,185,129,.5);font-family:Inter,sans-serif;font-size:.9rem;max-width:320px;animation:slideInRight .4s ease">
+        <div style="font-size:1.4rem;margin-bottom:.5rem">🎉 ¡Pago aprobado!</div>
+        <div style="font-weight:600;margin-bottom:.4rem">Gracias por tu compra</div>
+        <div style="font-size:.8rem;opacity:.9">Contactanos por WhatsApp para coordinar el envío.</div>
+      </div>`;
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(),10000);
+    }
   }
 })();
 </script>
@@ -1640,27 +1693,17 @@ function backToStep1() {
 }
 
 function pagarMercadoPago() {
-  // Send order to vendor via WhatsApp first
+  // Guardar datos en sessionStorage para usar después del pago
   if (window.checkoutData && currentProduct) {
-    const d = window.checkoutData;
-    const msg = encodeURIComponent(
-      `🛒 *NUEVO PEDIDO - CorDisp*\n\n` +
-      `*Producto:* ${currentProduct.name}\n` +
-      `*Precio:* ${currentProduct.priceStr}\n\n` +
-      `*Cliente:* ${d.nombre} ${d.apellido}\n` +
-      `*Email:* ${d.email}\n` +
-      `*Teléfono:* ${d.tel}\n\n` +
-      `*Dirección de envío:*\n` +
-      `${d.calle}${d.piso ? ' ' + d.piso : ''}\n` +
-      `${d.ciudad}, ${d.provincia} (CP: ${d.cp})\n\n` +
-      `*Pago:* MercadoPago`
-    );
-    // Open WA notification to vendor silently
-    const waUrl = `https://api.whatsapp.com/send?phone=543512470871&text=${msg}`;
-    window.open(waUrl, '_blank');
+    const pedido = {
+      producto: currentProduct.name,
+      precio: currentProduct.priceStr,
+      ...window.checkoutData
+    };
+    sessionStorage.setItem('pedidoCorDisp', JSON.stringify(pedido));
   }
-  // Go to MP
-  setTimeout(() => window.open(currentProduct.mp, '_blank'), 500);
+  // Ir directo a MercadoPago - cuando vuelva con status=approved se manda el WA
+  window.location.href = currentProduct.mp + '?back_url=' + encodeURIComponent(window.location.origin + window.location.pathname + '?status=approved');
 }
 
 function pagarTransferencia() {
@@ -1676,7 +1719,9 @@ function pagarTransferencia() {
       `*Dirección de envío:*\n` +
       `${d.calle}${d.piso ? ' ' + d.piso : ''}\n` +
       `${d.ciudad}, ${d.provincia} (CP: ${d.cp})\n\n` +
-      `Hola! Quiero pagar con transferencia para aprovechar el 10% de descuento. Por favor envíame los datos bancarios.`
+      `*Datos para transferir:*\n` +
+      `Alias: *1905.agua*\n` +
+      `Una vez realizada la transferencia, adjuntá el comprobante en este chat para confirmar tu pedido. ¡Gracias!`
     );
     window.open(`https://api.whatsapp.com/send?phone=543512470871&text=${msg}`, '_blank');
   }
